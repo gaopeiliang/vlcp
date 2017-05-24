@@ -2055,10 +2055,10 @@ class RouterUpdater(FlowUpdater):
                     ipaddress,macaddrss,netid,outmac = currentexternallgportinfo[p]
                     cmds.extend(_add_host_flow(ipaddress,macaddrss,netid,outmac))
 
-            if arp_request_event:
-                for e in arp_request_event:
-                    self.subroutine(self.waitForSend(e))
-                del arp_request_event[:]
+            # if arp_request_event:
+            #     for e in arp_request_event:
+            #         self.subroutine(self.waitForSend(e))
+            #     del arp_request_event[:]
 
             # because function '_getinterfaceinfobynetid' use self._lastallrouterinfo above
             # so change to new in last
@@ -2066,6 +2066,12 @@ class RouterUpdater(FlowUpdater):
 
             for m in self.execute_commands(connection, cmds):
                 yield m
+
+            if arp_request_event:
+                for e in arp_request_event:
+                    self.subroutine(self.waitForSend(e))
+
+                del arp_request_event[:]
 
         except Exception:
             self._logger.warning("router update flow exception, ignore it! continue", exc_info=True)
