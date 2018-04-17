@@ -91,6 +91,20 @@ class SubNetMap(DataObject):
         self.allocated_ips = dict()
 
 
+# when external subnet create, also create this struct to store
+# interconnect IP info
+class SubNetExternalInfo(DataObject):
+    _prefix = "viperflow.subnetexternalinfo"
+    _indices = ("id", )
+
+    def __init__(self, prefix=None, deleted=None):
+        super(SubNetExternalInfo, self).__init__(prefix=prefix, deleted=deleted)
+        self.external_info = dict()
+
+# register auto remove , when subnet remove , info remove auto
+SubNet._register_auto_remove("SubNetExternalInfo", lambda s: [SubNetExternalInfo.default_key(s.id)])
+
+
 class SubNetSet(DataObject):
     _prefix = 'viperflow.subnetset'
 

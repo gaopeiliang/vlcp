@@ -73,7 +73,10 @@ class ViperFlow(Module):
                        api(self.updatesubnets,self.app_routine),
                        api(self.deletesubnet,self.app_routine),
                        api(self.deletesubnets,self.app_routine),
-                       api(self.listsubnets,self.app_routine)
+                       api(self.listsubnets,self.app_routine),
+                       api(self.add_subnet_external_info, self.app_routine),
+                       api(self.remove_subnet_external_info, self.app_routine),
+                       api(self.update_subnet_external_info, self.app_routine)
                        )
     def main(self):
         if False:
@@ -2203,18 +2206,21 @@ class ViperFlow(Module):
         lgnetmapkeys = list(set([LogicalNetworkMap.default_key(sn['logicalnetwork']) for sn in newsubnets]))
         subnetobjkeys = [subnetobj[0].getkey() for subnetobj in subnetobjs]
         subnetmapobjkeys = [subnetobj[1].getkey() for subnetobj in subnetobjs]
+        subnetexternalobjkeys = [subnetobj[2].getkey() for subnetobj in subnetobjs if subnetobj[2]]
         subnetsetkey = SubNetSet.default_key()
 
-        keys = itertools.chain([subnetsetkey],subnetobjkeys,subnetmapobjkeys,lgnetmapkeys)
+        keys = itertools.chain([subnetsetkey], subnetobjkeys, subnetmapobjkeys, lgnetmapkeys, subnetexternalobjkeys)
 
         def subnetupdate(keys, values):
             subnetobjlen = len(subnetobjs)
             setobj = values[0]
-            lgnetmaps = values[1 + subnetobjlen * 2:]
+            lgnetmaps = values[1 + subnetobjlen * 2: 1 + subnetobjlen * 2 + len(lgnetmapkeys)]
             lgnetmkeys = [nm.getkey() for nm in lgnetmaps]
             lgnetmapdict = dict(zip(lgnetmkeys,lgnetmaps))
 
-            for index,(subnet,subnetmap) in enumerate(subnetobjs):
+            subnet_external_start_index = 1 + subnetobjlen * 2 + len(lgnetmapkeys)
+
+            for index, (subnet, subnetmap, _) in enumerate(subnetobjs):
                 values[index + 1] = set_new(values[index + 1],subnet)
                 values[index + 1 + subnetobjlen] = set_new(values[index + 1 + subnetobjlen],subnetmap)
 
@@ -2227,7 +2233,11 @@ class ViperFlow(Module):
 
                 setobj.set.dataset().add(subnet.create_weakreference())
 
-            return keys,values
+            for index, subnet_external in enumerate([e for _, _, e in subnetobjs if e]):
+                values[subnet_external_start_index + index] = set_new(values[subnet_external_start_index + index],
+                                                                      subnet_external)
+
+            return keys, values
         try:
             for m in callAPI(self.app_routine,'objectdb','transact',{"keys":keys,'updater':subnetupdate}):
                 yield m
@@ -2241,10 +2251,15 @@ class ViperFlow(Module):
         subnetobj = SubNet.create_instance(id)
         subnetobj.network = ReferenceObject(LogicalNetwork.default_key(logicalnetwork))
         subnetmapobj = SubNetMap.create_instance(id)
+        external_info_obj = None
+        # when isexternal subnet create, we create external info
+        if "isexternal" in kwargs:
+            external_info_obj = SubNetExternalInfo.create_instance(id)
+            subnetobj.external = ReferenceObject(external_info_obj.getkey())
 
-        for k,v in kwargs.items():
+        for k, v in kwargs.items():
             setattr(subnetobj,k,v)
-        return subnetobj,subnetmapobj
+        return subnetobj, subnetmapobj, external_info_obj
 
     def updatesubnet(self,id,**kwargs):
         """
@@ -2526,6 +2541,115 @@ class ViperFlow(Module):
 
                 with watch_context(keys,values,reqid,self.app_routine):
                     self.app_routine.retvalue = [dump(r) for r in values]
+
+    def add_subnet_external_info(self, id, systemid, bridge, local_ip, remote_ip):
+        """
+        add subnet external info
+        :param id: subnet external data id
+        :param systemid: ovs system id
+        :param bridge:  ovs bridge name
+        :param local_ip: local ip
+        :param remote_ip: remote ip
+        :return:
+        """
+        info = {"systemid": systemid, "bridge": bridge, "local_ip": local_ip, "remote_ip": remote_ip}
+
+        for m in self.set_subnet_external_infos(id, add_infos=[info]):
+            yield m
+
+    def remove_subnet_external_info(self, id, systemid, bridge):
+        """
+        remove subnet external info
+        :param id: subnet external data id
+        :param systemid: ovs system id
+        :param bridge: ovs bridge name
+        :return:
+        """
+        info = {"systemid": systemid, "bridge": bridge}
+
+        for m in self.set_subnet_external_infos(id, remove_infos=[info]):
+            yield m
+
+    def update_subnet_external_info(self, id, systemid, bridge, local_ip, remote_ip):
+        """
+        update subnet external info
+        :param id: subnet external data id
+        :param systemid: ovs system id
+        :param bridge:  ovs bridge name
+        :param local_ip: local ip
+        :param remote_ip: remote ip
+        :return: 
+        """
+        info = {"systemid": systemid, "bridge": bridge, "local_ip": local_ip, "remote_ip": remote_ip}
+        for m in self.set_subnet_external_infos(id, update_infos=[info]):
+            yield m
+
+    def set_subnet_external_infos(self, id, add_infos=None, update_infos=None, remove_infos=None):
+        """
+        set external subnet external info
+        :param id: external subnet data id
+        :param add_infos: info add to external {"systemid", "bridge", "local_ip", "remote_ip"}
+        :param update_infos: info update in external {"systemid", "bridge", "local_ip", "remote_ip"}
+        :param remove_infos: info remove from external {"systemid", "bridge"}
+        :return:
+        """
+        if add_infos is None:
+            add_infos = []
+
+        if remove_infos is None:
+            remove_infos = []
+
+        if update_infos is None:
+            update_infos = []
+
+        # check infos format
+        for info in add_infos + update_infos:
+            keys = info.keys()
+            for item in ["systemid", "bridge", "local_ip", "remote_ip"]:
+                if item not in keys:
+                    raise ValueError("add or update info %s not existed", item)
+
+        for info in remove_infos:
+            keys = info.keys()
+            for item in ["systemid", "bridge"]:
+                if item not in keys:
+                    raise ValueError("remove info %s not existed", item)
+
+        if add_infos or update_infos or remove_infos:
+            subnet_external_info_key = SubNetExternalInfo.default_key(id)
+
+            @updater
+            def set_info(subnet_external_info_obj):
+                if subnet_external_info_obj is None:
+                    raise ValueError("external info id %s not existed", id)
+
+                for info in add_infos:
+                    systemid = info["systemid"]
+                    bridge = info["bridge"]
+                    local_ip = info["local_ip"]
+                    remote_ip = info["remote_ip"]
+                    subnet_external_info_obj.external_info.update({'-'.join([systemid, bridge]): (local_ip, remote_ip)})
+
+                for info in update_infos:
+                    systemid = info["systemid"]
+                    bridge = info["bridge"]
+                    local_ip = info["local_ip"]
+                    remote_ip = info["remote_ip"]
+                    if '-'.join([systemid, bridge]) in subnet_external_info_obj.external_info:
+                        subnet_external_info_obj.external_info.update(
+                            {'-'.join([systemid, bridge]): (local_ip, remote_ip)})
+
+                for info in remove_infos:
+                    systemid = info["systemid"]
+                    bridge = info["bridge"]
+                    if '-'.join([systemid, bridge]) in subnet_external_info_obj.external_info:
+                        del subnet_external_info_obj.external_info['-'.join([systemid, bridge])]
+
+                return [subnet_external_info_obj]
+
+            for m in callAPI(self.app_routine, "objectdb", "transact", {"keys": [subnet_external_info_key],
+                                                                        "updater": set_info}):
+                yield m
 
     # the first run as routine going
     def load(self,container):
