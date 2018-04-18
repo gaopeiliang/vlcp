@@ -2544,17 +2544,18 @@ class ViperFlow(Module):
                 with watch_context(keys,values,reqid,self.app_routine):
                     self.app_routine.retvalue = [dump(r) for r in values]
 
-    def add_subnet_external_info(self, id, systemid, bridge, local_ip, remote_ip):
+    def add_subnet_external_info(self, id, systemid, bridge, cidr, local_ip, remote_ip):
         """
         add subnet external info
         :param id: subnet external data id
         :param systemid: ovs system id
         :param bridge:  ovs bridge name
+        :param cidr:  inter network cidr
         :param local_ip: local ip
         :param remote_ip: remote ip
         :return:
         """
-        info = {"systemid": systemid, "bridge": bridge, "local_ip": local_ip, "remote_ip": remote_ip}
+        info = {"systemid": systemid, "bridge": bridge, "cidr": cidr, "local_ip": local_ip, "remote_ip": remote_ip}
 
         for m in self.set_subnet_external_infos(id, add_infos=[info]):
             yield m
@@ -2572,7 +2573,7 @@ class ViperFlow(Module):
         for m in self.set_subnet_external_infos(id, remove_infos=[info]):
             yield m
 
-    def update_subnet_external_info(self, id, systemid, bridge, local_ip, remote_ip):
+    def update_subnet_external_info(self, id, systemid, bridge, cidr, local_ip, remote_ip):
         """
         update subnet external info
         :param id: subnet external data id
@@ -2582,7 +2583,7 @@ class ViperFlow(Module):
         :param remote_ip: remote ip
         :return: 
         """
-        info = {"systemid": systemid, "bridge": bridge, "local_ip": local_ip, "remote_ip": remote_ip}
+        info = {"systemid": systemid, "bridge": bridge, "cidr": cidr, "local_ip": local_ip, "remote_ip": remote_ip}
         for m in self.set_subnet_external_infos(id, update_infos=[info]):
             yield m
 
@@ -2607,7 +2608,7 @@ class ViperFlow(Module):
         # check infos format
         for info in add_infos + update_infos:
             keys = info.keys()
-            for item in ["systemid", "bridge", "local_ip", "remote_ip"]:
+            for item in ["systemid", "cidr", "bridge", "local_ip", "remote_ip"]:
                 if item not in keys:
                     raise ValueError("add or update info %s not existed", item)
 
@@ -2628,20 +2629,22 @@ class ViperFlow(Module):
                 for info in add_infos:
                     systemid = info["systemid"]
                     bridge = info["bridge"]
+                    cidr = info['cidr']
                     local_ip = info["local_ip"]
                     remote_ip = info["remote_ip"]
                     key = '.'.join([escape_key(systemid), escape_key(bridge)])
-                    subnet_external_info_obj.external_info.update({key: (local_ip, remote_ip)})
+                    subnet_external_info_obj.external_info.update({key: (cidr, local_ip, remote_ip)})
 
                 for info in update_infos:
                     systemid = info["systemid"]
                     bridge = info["bridge"]
+                    cidr = info['cidr']
                     local_ip = info["local_ip"]
                     remote_ip = info["remote_ip"]
                     key = '.'.join([escape_key(systemid), escape_key(bridge)])
                     if key in subnet_external_info_obj.external_info:
                         subnet_external_info_obj.external_info.update(
-                            {key: (local_ip, remote_ip)})
+                            {key: (cidr, local_ip, remote_ip)})
 
                 for info in remove_infos:
                     systemid = info["systemid"]

@@ -1108,8 +1108,9 @@ class RouterUpdater(FlowUpdater):
                             if k in subnet_to_external:
                                 key = '.'.join([escape_key(system_id), escape_key(bridge)])
                                 if key in subnet_to_external[k]:
-                                    local_ip, remote_ip = subnet_to_external[k][key]
+                                    cidr, local_ip, remote_ip = subnet_to_external[k][key]
                                     nv = list(v)
+                                    nv[0] = cidr
                                     nv[5] = local_ip
                                     nv[2] = remote_ip
                                     update_external_subnet[k] = tuple(nv)
