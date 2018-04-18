@@ -18,6 +18,8 @@ import copy
 import logging
 import itertools
 
+from vlcp.service.utils.knowledge import escape_key
+
 logger = logging.getLogger('viperflow')
 
 #logger.setLevel(logging.DEBUG)
@@ -2628,22 +2630,25 @@ class ViperFlow(Module):
                     bridge = info["bridge"]
                     local_ip = info["local_ip"]
                     remote_ip = info["remote_ip"]
-                    subnet_external_info_obj.external_info.update({'-'.join([systemid, bridge]): (local_ip, remote_ip)})
+                    key = '.'.join([escape_key(systemid), escape_key(bridge)])
+                    subnet_external_info_obj.external_info.update({key: (local_ip, remote_ip)})
 
                 for info in update_infos:
                     systemid = info["systemid"]
                     bridge = info["bridge"]
                     local_ip = info["local_ip"]
                     remote_ip = info["remote_ip"]
-                    if '-'.join([systemid, bridge]) in subnet_external_info_obj.external_info:
+                    key = '.'.join([escape_key(systemid), escape_key(bridge)])
+                    if key in subnet_external_info_obj.external_info:
                         subnet_external_info_obj.external_info.update(
-                            {'-'.join([systemid, bridge]): (local_ip, remote_ip)})
+                            {key: (local_ip, remote_ip)})
 
                 for info in remove_infos:
                     systemid = info["systemid"]
                     bridge = info["bridge"]
-                    if '-'.join([systemid, bridge]) in subnet_external_info_obj.external_info:
-                        del subnet_external_info_obj.external_info['-'.join([systemid, bridge])]
+                    key = '.'.join([escape_key(systemid), escape_key(bridge)])
+                    if key in subnet_external_info_obj.external_info:
+                        del subnet_external_info_obj.external_info[key]
 
                 return [subnet_external_info_obj]
 

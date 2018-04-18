@@ -24,6 +24,7 @@ from vlcp.utils.netutils import parse_ip4_network,get_netmask, parse_ip4_address
 from vlcp.utils.networkmodel import VRouter, RouterPort, SubNet, SubNetMap,DVRouterForwardInfo, \
     DVRouterForwardSet, DVRouterForwardInfoRef, DVRouterExternalAddressInfo, LogicalNetworkMap, LogicalNetwork, \
     LogicalPort, SubNetExternalInfo
+from vlcp.service.utils.knowledge import escape_key
 
 
 @withIndices("connection")
@@ -1105,8 +1106,9 @@ class RouterUpdater(FlowUpdater):
                     for k, v in currentsubnetinfo.items():
                         if v[1] and v[7]:
                             if k in subnet_to_external:
-                                if '-'.join([system_id, bridge]) in subnet_to_external[k]:
-                                    local_ip, remote_ip = subnet_to_external[k]['-'.join([system_id, bridge])]
+                                key = '.'.join([escape_key(system_id), escape_key(bridge)])
+                                if key in subnet_to_external[k]:
+                                    local_ip, remote_ip = subnet_to_external[k][key]
                                     nv = list(v)
                                     nv[5] = local_ip
                                     nv[2] = remote_ip
