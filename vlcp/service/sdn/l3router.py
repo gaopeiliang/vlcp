@@ -947,7 +947,7 @@ class RouterUpdater(FlowUpdater):
                                                                 if hasattr(weaksubnet, "external"):
                                                                     try:
                                                                         subnet_external_obj = walk(
-                                                                            subnetobj.external.getkey())
+                                                                            weaksubnet.external.getkey())
                                                                     except KeyError:
                                                                         pass
                                                                     else:
@@ -1107,8 +1107,8 @@ class RouterUpdater(FlowUpdater):
                         if v[1] and v[7]:
                             if k in subnet_to_external:
                                 key = '.'.join([escape_key(system_id), escape_key(bridge)])
-                                if key in subnet_to_external[k]:
-                                    cidr, local_ip, remote_ip = subnet_to_external[k][key]
+                                if key in subnet_to_external[k].external_info:
+                                    cidr, local_ip, remote_ip = subnet_to_external[k].external_info[key]
                                     nv = list(v)
                                     nv[0] = cidr
                                     nv[5] = local_ip
